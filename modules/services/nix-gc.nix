@@ -83,16 +83,18 @@ in
     };
   };
 
-  config = lib.mkIf cfg.automatic {
+  config = let
+    nix-gc = pkgs.writeShellScript "nix-gc" "exec ${nixPackage}/bin/nix-collect-garbage ${
+      lib.optionalString (cfg.options != null) cfg.options
+    }";
+  in lib.mkIf cfg.automatic {
     systemd.user.services.nix-gc = {
       Unit = {
         Description = "Nix Garbage Collector";
       };
       Service = {
         Type = "oneshot";
-        ExecStart = pkgs.writeShellScript "nix-gc" "exec ${nixPackage}/bin/nix-collect-garbage ${
-          lib.optionalString (cfg.options != null) cfg.options
-        }";
+        ExecStart = nix-gc;
       };
     };
 
@@ -123,9 +125,8 @@ in
       enable = true;
       config = {
         ProgramArguments = [
-          "${nixPackage}/bin/nix-collect-garbage"
-        ]
-        ++ lib.optional (cfg.options != null) cfg.options;
+          (toString nix-gc)
+        ];
         StartCalendarInterval = lib.hm.darwin.mkCalendarInterval (lib.elemAt cfg.dates 0);
       };
     };
